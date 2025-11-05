@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Web Clipper Settings</title>
+  <style>
+    body { font-family: sans-serif; padding: 1em; width: 400px; }
+    div { margin-bottom: 1em; }
+    label { display: block; margin-bottom: 0.5em; }
+    input, textarea { width: 100%; box-sizing: border-box; }
+    #status { color: green; }
+  </style>
+</head>
+<body>
+  <h1>Web Clipper Settings</h1>
+
+  <div>
+    <label for="vault">Obsidian Vault Name:</label>
+    <input type="text" id="vault">
+  </div>
+
+  <div>
+    <label for="filenames">Suggested File Names (one per line):</label>
+    <textarea id="filenames" rows="5"></textarea>
+  </div>
+
+  <button id="save">Save</button>
+  <div id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

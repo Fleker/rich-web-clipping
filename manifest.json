@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Felker Web Clipper",
+  "version": "0.1.0",
+  "description": "Clips content from websites, summarizes it with AI, and sends it to Obsidian.",
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "clipboardWrite",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://twitter.com/*",
+    "https://x.com/*",
+    "https://www.instapaper.com/read/*",
+    "https://bsky.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [{
+      "resources": ["background.js"],
+      "matches": ["<all_urls>"]
+  }],
+  "options_page": "options.html",
+  "trial_tokens": [
+    "A2vcIvxIPKOCnSV5np9r2ZHrsGOoNfkb7766Jgc9R73mB6DbxJFb2ddMYgQn/+FFo3DmslwdGb++mHQan1cs+QcAAACPeyJvcmlnaW4iOiJjaHJvbWUtZXh0ZW5zaW9uOi8vZnBobXBpY2djamttZmFvZGFrZmFlbmFjaWRuamRpbHAiLCJmZWF0dXJlIjoiQUlQcm9tcHRBUElNdWx0aW1vZGFsSW5wdXQiLCJleHBpcnkiOjE3NzQzMTA0MDAsImlzVGhpcmRQYXJ0eSI6dHJ1ZX0="
+  ],
+  "icons": {
+    "16": "green-clipboard-16.png",
+    "128": "green-clipboard-128.png"
+  }
+}

@@ -1,0 +1,32 @@
+const CONTEXT_MENU_ID = "FELKER_WEB_CLIPPER";
+
+console.log('felker clipper loaded')
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('felker clipper initialized')
+  chrome.contextMenus.create({
+    id: CONTEXT_MENU_ID,
+    title: "Clip to Obsidian",
+    contexts: ["page", "link", "image"],
+    documentUrlPatterns: [
+      "https://twitter.com/*",
+      "https://x.com/*",
+      "https://www.instapaper.com/read/*",
+      "https://bsky.app/*"
+    ]
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === CONTEXT_MENU_ID) {
+    console.log('info', info)
+    console.log('tab', tab)
+    // Send a message to the content script to start the clipping process
+    chrome.tabs.sendMessage(tab.id, { action: "clipContent" }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error(chrome.runtime.lastError.message);
+      } else {
+        console.log("Clipping process started.");
+      }
+    });
+  }
+});
