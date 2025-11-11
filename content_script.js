@@ -10,12 +10,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true; // Indicates that the response is sent asynchronously
 });
 
-// add origin trial key
-const otMeta = document.createElement('meta');
-otMeta.httpEquiv = 'origin-trial';
-otMeta.content = "A2vcIvxIPKOCnSV5np9r2ZHrsGOoNfkb7766Jgc9R73mB6DbxJFb2ddMYgQn/+FFo3DmslwdGb++mHQan1cs+QcAAACPeyJvcmlnaW4iOiJjaHJvbWUtZXh0ZW5zaW9uOi8vZnBobXBpY2djamttZmFvZGFrZmFlbmFjaWRuamRpbHAiLCJmZWF0dXJlIjoiQUlQcm9tcHRBUElNdWx0aW1vZGFsSW5wdXQiLCJleHBpcnkiOjE3NzQzMTA0MDAsImlzVGhpcmRQYXJ0eSI6dHJ1ZX0=";
-document.head.append(otMeta);
-
 let languageModelWorking = false
 
 // check web clip status
@@ -31,11 +25,15 @@ async function main() {
   if (!languageModelWorking) {
     return window.alert('Language model is not available')
   }
+  // unawaited
+  chrome.runtime.sendMessage({ action: "showNotification" });
+
   try {
     // 1. Extract content from the page
     const pageContent = extractContent(window.location.href);
     if (!pageContent) {
       console.log("No content to clip on this page.");
+      await chrome.runtime.sendMessage({ action: "clearNotification" });
       return;
     }
 
@@ -44,6 +42,9 @@ async function main() {
 
     // 3. Use on-device AI for summary and filename
     const aiResult = await getAiSummaryAndFileName(pageContent.text, pageContent.images, fileNames || []);
+    // unawaited
+    chrome.runtime.sendMessage({ action: "clearNotification" });
+
     if (aiResult === null) {
       return window.alert('Oops the AI result was bad')
     }
@@ -51,13 +52,14 @@ async function main() {
     // 4. Format the content for the clipboard
     const markdownContent = `* [${aiResult.summary}](${window.location.href})`;
 
-    // 5. Copy to clipboard
-    await navigator.clipboard.writeText(markdownContent);
-
     // 6. Show confirmation dialog
-    const confirmationMessage = `File: ${aiResult.titleName}\n\nContent:\n${markdownContent}`;
-    if (window.confirm(confirmationMessage)) {
-      await navigator.clipboard.writeText(markdownContent);
+    const confirmationMessage = `File: ${aiResult.titleName}\n\nContent:\n${markdownContent}\n\nPress OK to Open Obsidian`;
+    const shouldOpenObsidian = window.confirm(confirmationMessage)
+    await navigator.clipboard.writeText(markdownContent)
+    // unawaited
+    chrome.runtime.sendMessage({ action: "clearNotification" });
+
+    if (shouldOpenObsidian) {
       // 7. Open Obsidian URI
       const obsidianUri = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(aiResult.titleName)}.md`;
       window.location.href = obsidianUri;
@@ -65,6 +67,8 @@ async function main() {
   } catch (error) {
     console.error("Web Clipper Error:", error);
     alert("An error occurred while clipping the content.");
+    // unawaited
+    chrome.runtime.sendMessage({ action: "clearNotification" });
   }
 }
 
@@ -155,6 +159,17 @@ async function getAiSummaryAndFileName(content, imageContext, suggestedFiles) {
       .replace(/```json/g, '')
       .replace(/```/g, '')
       .trim()
+    // This regex specifically targets the string value of the "summary" key.
+    const summaryValueRegex = /("summary":\s*")(.+?)("(?=\s*,|\s*\}))/s;
+
+    aiProcessedRes = aiProcessedRes.replace(summaryValueRegex, (match, opening, content, closing) => {
+        // Inside the captured content (Group 2), we replace all double quotes (")
+        // with an escaped double quote (\")
+        const fixedContent = content.replace(/[^\\]"/g, '\\"');
+
+        // Reconstruct the valid JSON string for this field
+        return opening + fixedContent + closing;
+    });
     console.log('res2',aiProcessedRes)
     // The AI response might have extra text, so we find the JSON part.
     // const jsonMatch = aiProcessedRes;
