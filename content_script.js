@@ -124,6 +124,8 @@ async function extractContent(url) {
   } else if (hostname.includes("bsky.app")) {
     // Extract post, thread, quoted post, images
     console.debug("Extracting from BlueSky");
+    // console.debug([...document.querySelectorAll('[data-testid]')]
+    //   .filter(x => x.dataset.testid.startsWith('postThreadItem') && x.clientWidth > 0)[0].innerText)
     const imageBitmaps = await Promise.all(
       [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].querySelectorAll('img')]
         .filter(img => {
@@ -136,8 +138,8 @@ async function extractContent(url) {
     );
 
     return {
-      text: [...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].innerText,
-      imageCaptions: [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].querySelectorAll('img')].map(x => x.alt).filter(x => x),
+      text: [...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem') && x.clientWidth > 0)[0].innerText,
+      imageCaptions: [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem') && x.clientWidth > 0)[0].querySelectorAll('img')].map(x => x.alt).filter(x => x),
       imageBitmaps,
     }
   } else if (hostname.includes("instapaper.com")) {
