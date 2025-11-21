@@ -6,6 +6,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true; // Indicates that the response is sent asynchronously
 });
 
+const otMeta = document.createElement('meta');
+otMeta.httpEquiv = 'origin-trial';
+otMeta.content = 'A2vcIvxIPKOCnSV5np9r2ZHrsGOoNfkb7766Jgc9R73mB6DbxJFb2ddMYgQn/+FFo3DmslwdGb++mHQan1cs+QcAAACPeyJvcmlnaW4iOiJjaHJvbWUtZXh0ZW5zaW9uOi8vZnBobXBpY2djamttZmFvZGFrZmFlbmFjaWRuamRpbHAiLCJmZWF0dXJlIjoiQUlQcm9tcHRBUElNdWx0aW1vZGFsSW5wdXQiLCJleHBpcnkiOjE3NzQzMTA0MDAsImlzVGhpcmRQYXJ0eSI6dHJ1ZX0=';
+document.head.append(otMeta);
+
 let languageModelWorking = false
 
 // check web clip status
@@ -26,7 +31,7 @@ async function main() {
 
   try {
     // 1. Extract content from the page
-    const pageContent = extractContent(window.location.href);
+    const pageContent = await extractContent(window.location.href);
     if (!pageContent) {
       console.debug("No content to clip on this page.");
       await chrome.runtime.sendMessage({ action: "clearNotification" });
@@ -37,7 +42,12 @@ async function main() {
     const { vaultName, fileNames } = await chrome.storage.sync.get(["vaultName", "fileNames"]);
 
     // 3. Use on-device AI for summary and filename
-    const aiResult = await getAiSummaryAndFileName(pageContent.text, pageContent.images, fileNames || []);
+    const aiResult = await getAiSummaryAndFileName(
+      pageContent.text,
+      pageContent.imageCaptions,
+      pageContent.imageBitmaps || [],
+      fileNames || []
+    );
     // unawaited
     chrome.runtime.sendMessage({ action: "clearNotification" });
 
@@ -51,7 +61,9 @@ async function main() {
     // 6. Show confirmation dialog
     const confirmationMessage = `File: ${aiResult.titleName}\n\nContent:\n${markdownContent}\n\nPress OK to Open Obsidian`;
     const shouldOpenObsidian = window.confirm(confirmationMessage)
-    await navigator.clipboard.writeText(markdownContent)
+    window.requestAnimationFrame(async () => {
+      await navigator.clipboard.writeText(markdownContent)
+    })
     // unawaited
     chrome.runtime.sendMessage({ action: "clearNotification" });
 
@@ -68,7 +80,37 @@ async function main() {
   }
 }
 
-function extractContent(url) {
+async function getCrossOriginBitmap(imageUrl) {
+    // 1. Send the URL to the background script
+    const response = await chrome.runtime.sendMessage({
+        action: "fetchCrossOriginImage",
+        url: imageUrl
+    });
+
+    if (response.error) {
+        throw new Error(response.error);
+    }
+    
+    // 2. Receive the image as a Data URL
+    const dataUrl = response.dataUrl;
+
+    // 3. Load the Data URL into a temporary, same-origin image element
+    const tempImg = new Image();
+    tempImg.src = dataUrl;
+
+    // Wait for the image to load
+    await new Promise((resolve, reject) => {
+        tempImg.onload = resolve;
+        tempImg.onerror = reject;
+    });
+
+    // 4. Create the ImageBitmap (now safe to draw to canvas/create bitmap)
+    const bitmap = await createImageBitmap(tempImg);
+    
+    return bitmap;
+}
+
+async function extractContent(url) {
   const hostname = new URL(url).hostname;
   // TODO: Implement content extraction logic for each service
   if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
@@ -77,14 +119,26 @@ function extractContent(url) {
 
     return {
       text: document.querySelector('article').innerText,
-      images: [...document.querySelector('article').querySelectorAll('img')].map(x => x.alt).filter(x => x)
+      imageCaptions: [...document.querySelector('article').querySelectorAll('img')].map(x => x.alt).filter(x => x)
     }
   } else if (hostname.includes("bsky.app")) {
     // Extract post, thread, quoted post, images
     console.debug("Extracting from BlueSky");
+    const imageBitmaps = await Promise.all(
+      [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].querySelectorAll('img')]
+        .filter(img => {
+          return !img.src.includes('avatar')
+        })
+        .map(async (img) => {
+          console.debug(img.src)
+          return await getCrossOriginBitmap(img.src)
+        })
+    );
+
     return {
       text: [...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].innerText,
-      images: [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].querySelectorAll('img')].map(x => x.alt),
+      imageCaptions: [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].querySelectorAll('img')].map(x => x.alt).filter(x => x),
+      imageBitmaps,
     }
   } else if (hostname.includes("instapaper.com")) {
     // Extract article content
@@ -97,19 +151,21 @@ function extractContent(url) {
       STORY:
       ${document.querySelector('#story').innerText}
       `,
-      images: [],
+      imageCaptions: [],
     }
   }
   return null;
 }
 
-async function getAiSummaryAndFileName(content, imageContext, suggestedFiles) {
+async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, suggestedFiles) {
   const params = await LanguageModel.params();
   const session = await LanguageModel.create({
     temperature: 0.2,
     topK: params.defaultTopK,
     expectedInputs: [{
-      type:'text', languages: ['en']
+      type:'text', languages: ['en'],
+    }, {
+      type:'image'
     }],
     expectedOutputs: [{
       type:'text', languages: ['en']
@@ -132,6 +188,10 @@ async function getAiSummaryAndFileName(content, imageContext, suggestedFiles) {
     - ${imageContext.join("\n- ")}}
     ---
 
+    ${imageBitmaps.length ? `
+    Use the images included in this prompt in your summary
+    ` : ''}
+
     Respond in JSON format with "summary" and "titleName" keys. The titleName should not include an extension.
     Example: {"summary": "A summary of the content.", "titleName": "A Good File Name"}
   `;
@@ -145,8 +205,22 @@ async function getAiSummaryAndFileName(content, imageContext, suggestedFiles) {
   }
 
   console.debug(prompt)
+  console.debug(imageBitmaps.length, 'bitmaps')
+  const promptContent = [{
+    type: 'text',
+    value: prompt
+  }]
+  if (imageBitmaps.length) {
+    imageBitmaps.forEach(img => {
+      promptContent.push({
+        type: 'image',
+        value: img,
+      })
+    })
+    console.debug(promptContent)
+  }
   const aiResponse = await session.prompt([
-    { role: "user", content: prompt, responseConstraint: schema},
+    { role: "user", content: promptContent, responseConstraint: schema},
   ]);
   console.debug('res1', aiResponse)
 

@@ -37,7 +37,41 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
   } else if (request.action === "clearNotification") {
     chrome.notifications.clear(NOTIFICATION_ID);
+  } else if (request.action === "fetchCrossOriginImage") {
+    // Check if the message is a request to fetch an image
+    if (request.url) {
+      console.debug(request.url)
+        // Use fetch() to download the image, bypassing CORS restrictions
+        fetch(request.url)
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to fetch image');
+                return response.blob();
+            })
+            .then(blob => {
+                // Convert the blob to a base64 Data URL to send back to the content script
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                });
+            })
+            .then(dataUrl => {
+                sendResponse({ dataUrl: dataUrl });
+            })
+            .catch(error => {
+                console.error("Background fetch error:", error);
+                sendResponse({ error: error.message });
+            });
+        
+        // Return true to indicate you will send a response asynchronously
+        return true; 
+    }
   }
   // Keep the message channel open for the response
   return false;
+});
+
+// allow us to fetch images
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    
 });
