@@ -27,3 +27,8 @@ function restoreOptions() {
 
 document.addEventListener('DOMContentLoaded', restoreOptions);
 document.getElementById('save').addEventListener('click', saveOptions);
+
+LanguageModel.availability()
+  .then((isAvailable) => {
+    document.getElementById('dl-stat').innerText = isAvailable
+  })

@@ -1,9 +1,5 @@
-console.log('felker content')
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "clipContent") {
-    console.log('request', request)
-    console.log('sender', sender)
     main();
     sendResponse({ status: "started" });
   }
@@ -32,7 +28,7 @@ async function main() {
     // 1. Extract content from the page
     const pageContent = extractContent(window.location.href);
     if (!pageContent) {
-      console.log("No content to clip on this page.");
+      console.debug("No content to clip on this page.");
       await chrome.runtime.sendMessage({ action: "clearNotification" });
       return;
     }
@@ -77,7 +73,7 @@ function extractContent(url) {
   // TODO: Implement content extraction logic for each service
   if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
     // Extract tweet, thread, quoted tweet, images
-    console.log("Extracting from Twitter/X");
+    console.debug("Extracting from Twitter/X");
 
     return {
       text: document.querySelector('article').innerText,
@@ -85,14 +81,14 @@ function extractContent(url) {
     }
   } else if (hostname.includes("bsky.app")) {
     // Extract post, thread, quoted post, images
-    console.log("Extracting from BlueSky");
+    console.debug("Extracting from BlueSky");
     return {
       text: [...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].innerText,
       images: [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].querySelectorAll('img')].map(x => x.alt),
     }
   } else if (hostname.includes("instapaper.com")) {
     // Extract article content
-    console.log("Extracting from Instapaper");
+    console.debug("Extracting from Instapaper");
     return {
       text: `Make sure you take note of the author and title in particular.
       TITLE AND AUTHOR:
@@ -148,11 +144,11 @@ async function getAiSummaryAndFileName(content, imageContext, suggestedFiles) {
     }
   }
 
-  console.log(prompt)
+  console.debug(prompt)
   const aiResponse = await session.prompt([
     { role: "user", content: prompt, responseConstraint: schema},
   ]);
-  console.log('res1', aiResponse)
+  console.debug('res1', aiResponse)
 
   try {
     let aiProcessedRes = aiResponse
@@ -170,7 +166,7 @@ async function getAiSummaryAndFileName(content, imageContext, suggestedFiles) {
         // Reconstruct the valid JSON string for this field
         return opening + fixedContent + closing;
     });
-    console.log('res2',aiProcessedRes)
+    console.debug('res2',aiProcessedRes)
     // The AI response might have extra text, so we find the JSON part.
     // const jsonMatch = aiProcessedRes;
 
