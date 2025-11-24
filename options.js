@@ -31,4 +31,23 @@ document.getElementById('save').addEventListener('click', saveOptions);
 LanguageModel.availability()
   .then((isAvailable) => {
     document.getElementById('dl-stat').innerText = isAvailable
+    if (isAvailable === 'downloadable') {
+      document.getElementById('dl-btn').style.display = 'block'
+      document.getElementById('dl-btn').disabled = false
+    } else {
+      document.getElementById('dl-btn').style.display = 'none'
+    }
   })
+
+document.getElementById('dl-btn').onclick = modeldl
+
+function modeldl() {
+  document.getElementById('dl-progress').innerText = 'Downloading model...'
+  LanguageModel.create({
+    monitor(m) {
+      m.addEventListener('downloadprogress', (e) => {
+        document.getElementById('dl-progress').innerText = `Downloaded ${e.loaded * 100}%`;
+      });
+    },
+  });
+}
