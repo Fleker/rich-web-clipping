@@ -16,10 +16,9 @@ let languageModelWorking = false
 // check web clip status
 LanguageModel.availability()
   .then((isAvailable) => {
-    if (isAvailable !== 'available') {
-      window.alert(`Language model status is ${isAvailable}`)
+    if (isAvailable === 'available') {
+      languageModelWorking = true;
     }
-    languageModelWorking = true;
   })
 
 async function main() {
@@ -112,14 +111,22 @@ async function getCrossOriginBitmap(imageUrl) {
 
 async function extractContent(url) {
   const hostname = new URL(url).hostname;
-  // TODO: Implement content extraction logic for each service
   if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
     // Extract tweet, thread, quoted tweet, images
     console.debug("Extracting from Twitter/X");
 
+    const imageBitmaps = await Promise.all(
+      [...document.querySelectorAll('article div[data-testid="tweetPhoto"] img')]
+        .map(async (img) => {
+          console.debug(img.src)
+          return await getCrossOriginBitmap(img.src)
+        })
+    );
+
     return {
       text: document.querySelector('article').innerText,
-      imageCaptions: [...document.querySelector('article').querySelectorAll('img')].map(x => x.alt).filter(x => x)
+      imageCaptions: [...document.querySelector('article').querySelectorAll('img')].map(x => x.alt).filter(x => x),
+      imageBitmaps,
     }
   } else if (hostname.includes("bsky.app")) {
     // Extract post, thread, quoted post, images
@@ -155,8 +162,14 @@ async function extractContent(url) {
       `,
       imageCaptions: [],
     }
+  } else {
+    console.debug("Extracting generic content");
+    return {
+      text: document.body.innerText,
+      imageCaptions: [...document.querySelectorAll('img')].map(x => x.alt).filter(x => x),
+      imageBitmaps: [],
+    }
   }
-  return null;
 }
 
 async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, suggestedFiles) {
