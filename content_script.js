@@ -2,6 +2,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "clipContent") {
     main();
     sendResponse({ status: "started" });
+  } else if (request.action === "clipVerbatim") {
+    clipVerbatim();
+    sendResponse({ status: "started" });
+  } else if (request.action === "clipArticle") {
+    clipArticle();
+    sendResponse({ status: "started" });
   }
   return true; // Indicates that the response is sent asynchronously
 });
@@ -60,9 +66,10 @@ async function main() {
     // 6. Show confirmation dialog
     const confirmationMessage = `File: ${aiResult.titleName}\n\nContent:\n${markdownContent}\n\nPress OK to Open Obsidian`;
     const shouldOpenObsidian = window.confirm(confirmationMessage)
-    window.requestAnimationFrame(async () => {
+    window.setTimeout(async () => {
+      console.log(markdownContent)
       await navigator.clipboard.writeText(markdownContent)
-    })
+    }, 100)
     // unawaited
     chrome.runtime.sendMessage({ action: "clearNotification" });
 
@@ -117,6 +124,7 @@ async function extractContent(url) {
 
     const imageBitmaps = await Promise.all(
       [...document.querySelectorAll('article div[data-testid="tweetPhoto"] img')]
+        .slice(0, 4)
         .map(async (img) => {
           console.debug(img.src)
           return await getCrossOriginBitmap(img.src)
@@ -237,7 +245,7 @@ async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, sugg
   const aiResponse = await session.prompt([
     { role: "user", content: promptContent, responseConstraint: schema},
   ]);
-  console.debug('res1', aiResponse)
+  // console.debug('res1', aiResponse)
 
   try {
     let aiProcessedRes = aiResponse
@@ -255,7 +263,7 @@ async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, sugg
         // Reconstruct the valid JSON string for this field
         return opening + fixedContent + closing;
     });
-    console.debug('res2',aiProcessedRes)
+    // console.debug('res2',aiProcessedRes)
     // The AI response might have extra text, so we find the JSON part.
     // const jsonMatch = aiProcessedRes;
 
@@ -268,4 +276,28 @@ async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, sugg
   } finally {
     session.destroy();
   }
+}
+
+async function clipVerbatim() {
+  const url = window.location.href
+
+  const hostname = new URL(url).hostname;
+  if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
+    const bodyText = document.querySelector('article div[data-testid="tweetText"]').innerText
+    await navigator.clipboard.writeText(`* ["${bodyText}"](${url})`)
+  } else if (hostname.includes("bsky.app")) {
+    const bodyText = [...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem') && x.clientWidth > 0)[0].innerText
+    await navigator.clipboard.writeText(`* ["${bodyText}"](${url})`)
+  }
+}
+
+async function clipArticle() {
+  const url = window.location.href
+  const headline = document.querySelector('main h1').innerText
+  const origin = document.querySelector('a.original')?.innerText?.trim()
+  const authors = document.querySelector('.author')?.innerText?.trim()
+
+  const message = `* ["${headline}" - ${origin} (${authors})](${url})`
+  console.debug(message)
+  await navigator.clipboard.writeText(message)
 }

@@ -1,24 +1,56 @@
 const CONTEXT_MENU_ID = "FELKER_WEB_CLIPPER";
+const CONTEXT_MENU_VERBATIM_ID = "FELKER_WEB_CLIPPER_VERBATIM";
+const CONTEXT_MENU_ARTICLE_ID = "FELKER_WEB_CLIPPER_ARTICLE";
 const NOTIFICATION_ID = "FELKER_WEB_CLIPPER_NOTIFICATION";
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: CONTEXT_MENU_ID,
-    title: "Clip to Obsidian",
+    title: "Clip to Obsidian (ALPHA)",
+    contexts: ["page", "link", "image"],
+    documentUrlPatterns: [
+      "<all_urls>",
+    ]
+  });
+
+  chrome.contextMenus.create({
+    id: CONTEXT_MENU_VERBATIM_ID,
+    title: "Clip text verbatim (ALPHA)",
     contexts: ["page", "link", "image"],
     documentUrlPatterns: [
       "https://twitter.com/*",
       "https://x.com/*",
-      "https://www.instapaper.com/read/*",
-      "https://bsky.app/*"
+      "https://bsky.app/*",
     ]
   });
+
+  chrome.contextMenus.create({
+    id: CONTEXT_MENU_ARTICLE_ID,
+    title: "Clip headline (ALPHA)",
+    contexts: ["page"],
+    documentUrlPatterns: [
+      "https://*.instapaper.com/*",
+    ]
+  });
+  console.log('1')
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === CONTEXT_MENU_ID) {
     // Send a message to the content script to start the clipping process
     chrome.tabs.sendMessage(tab.id, { action: "clipContent" }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error(chrome.runtime.lastError.message);
+      }
+    });
+  } else if (info.menuItemId === CONTEXT_MENU_VERBATIM_ID) {
+    chrome.tabs.sendMessage(tab.id, { action: "clipVerbatim" }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error(chrome.runtime.lastError.message);
+      }
+    });
+  } else if (info.menuItemId === CONTEXT_MENU_ARTICLE_ID) {
+    chrome.tabs.sendMessage(tab.id, { action: "clipArticle" }, (response) => {
       if (chrome.runtime.lastError) {
         console.error(chrome.runtime.lastError.message);
       }
@@ -69,9 +101,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   // Keep the message channel open for the response
   return false;
-});
-
-// allow us to fetch images
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    
 });

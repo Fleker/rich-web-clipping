@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Felker Web Clipper",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "description": "Clips content from websites, summarizes it with AI, and sends it to Obsidian.",
   "permissions": [
     "contextMenus",
@@ -34,8 +34,5 @@
   "icons": {
     "16": "green-clipboard-16.png",
     "128": "green-clipboard-128.png"
-  },
-  "origin_trials": {
-    "AIPromptAPIMultimodalInput": "A2vcIvxIPKOCnSV5np9r2ZHrsGOoNfkb7766Jgc9R73mB6DbxJFb2ddMYgQn/+FFo3DmslwdGb++mHQan1cs+QcAAACPeyJvcmlnaW4iOiJjaHJvbWUtZXh0ZW5zaW9uOi8vZnBobXBpY2djamttZmFvZGFrZmFlbmFjaWRuamRpbHAiLCJmZWF0dXJlIjoiQUlQcm9tcHRBUElNdWx0aW1vZGFsSW5wdXQiLCJleHBpcnkiOjE3NzQzMTA0MDAsImlzVGhpcmRQYXJ0eSI6dHJ1ZX0="
-  } 
+  }
 }
