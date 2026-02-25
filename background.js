@@ -29,7 +29,7 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "Clip headline (ALPHA)",
     contexts: ["page"],
     documentUrlPatterns: [
-      "https://*.instapaper.com/*",
+      "<all_urls>",
     ]
   });
   console.log('1')

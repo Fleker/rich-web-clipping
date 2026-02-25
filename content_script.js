@@ -292,10 +292,21 @@ async function clipVerbatim() {
 }
 
 async function clipArticle() {
+  let headline; let origin; let authors;
   const url = window.location.href
-  const headline = document.querySelector('main h1').innerText
-  const origin = document.querySelector('a.original')?.innerText?.trim()
-  const authors = document.querySelector('.author')?.innerText?.trim()
+  if (url.includes('instapaper')) {
+    headline = document.querySelector('main h1').innerText
+    origin = document.querySelector('a.original')?.innerText?.trim()
+    authors = document.querySelector('.author')?.innerText?.trim()
+  } else {
+    headline = document.querySelector('meta[property="og:title"]')?.content
+    origin = document.querySelector('meta[property="og:site_name"]')?.content
+    // cXenseParse:author
+    authors = (
+      document.querySelector('meta[property="cXenseParse:author"]') ??
+      document.querySelector('meta[name="dc.creator"]')
+    )?.content
+  }
 
   const message = `* ["${headline}" - ${origin} (${authors})](${url})`
   console.debug(message)
