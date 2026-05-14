@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Felker Web Clipper",
-  "version": "1.2.0",
+  "version": "1.3.1",
   "description": "Clips content from websites, summarizes it with AI, and sends it to Obsidian.",
   "permissions": [
     "contextMenus",

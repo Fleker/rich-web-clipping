@@ -301,10 +301,10 @@ async function clipArticle() {
   } else {
     headline = document.querySelector('meta[property="og:title"]')?.content
     origin = document.querySelector('meta[property="og:site_name"]')?.content
-    // cXenseParse:author
     authors = (
       document.querySelector('meta[property="cXenseParse:author"]') ??
-      document.querySelector('meta[name="dc.creator"]')
+      document.querySelector('meta[name="dc.creator"]') ??
+      document.querySelector('meta[name="byl"]')
     )?.content
   }
 

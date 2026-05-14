@@ -2,11 +2,14 @@ const CONTEXT_MENU_ID = "FELKER_WEB_CLIPPER";
 const CONTEXT_MENU_VERBATIM_ID = "FELKER_WEB_CLIPPER_VERBATIM";
 const CONTEXT_MENU_ARTICLE_ID = "FELKER_WEB_CLIPPER_ARTICLE";
 const NOTIFICATION_ID = "FELKER_WEB_CLIPPER_NOTIFICATION";
+/** Add a suffix so I know whether this is dev or prod */
+// const DEBUG_SUFF = ` (ALPHA)`
+const DEBUG_SUFF = ``
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: CONTEXT_MENU_ID,
-    title: "Clip to Obsidian (ALPHA)",
+    title: `Clip to Obsidian${DEBUG_SUFF}`,
     contexts: ["page", "link", "image"],
     documentUrlPatterns: [
       "<all_urls>",
@@ -15,7 +18,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
   chrome.contextMenus.create({
     id: CONTEXT_MENU_VERBATIM_ID,
-    title: "Clip text verbatim (ALPHA)",
+    title: `Clip text verbatim${DEBUG_SUFF}`,
     contexts: ["page", "link", "image"],
     documentUrlPatterns: [
       "https://twitter.com/*",
@@ -26,7 +29,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
   chrome.contextMenus.create({
     id: CONTEXT_MENU_ARTICLE_ID,
-    title: "Clip headline (ALPHA)",
+    title: `Clip headline${DEBUG_SUFF}`,
     contexts: ["page"],
     documentUrlPatterns: [
       "<all_urls>",
