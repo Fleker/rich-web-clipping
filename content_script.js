@@ -20,7 +20,10 @@ document.head.append(otMeta);
 let languageModelWorking = false
 
 // check web clip status
-LanguageModel.availability()
+LanguageModel.availability({
+  expectedInputs: [{type: 'text', languages: ['en']}, { type:'image' }],
+  expectedOutputs: [{type: 'text', languages: ['en']}],
+})
   .then((isAvailable) => {
     if (isAvailable === 'available') {
       languageModelWorking = true;
