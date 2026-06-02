@@ -8,6 +8,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "clipArticle") {
     clipArticle();
     sendResponse({ status: "started" });
+  } else if (request.action === "clipCitation") {
+    clipCitation();
+    sendResponse({ status: "started" });
   }
   return true; // Indicates that the response is sent asynchronously
 });
@@ -66,21 +69,15 @@ async function main() {
     // 4. Format the content for the clipboard
     const markdownContent = `* [${aiResult.summary}](${window.location.href})`;
 
-    // 6. Show confirmation dialog
-    const confirmationMessage = `File: ${aiResult.titleName}\n\nContent:\n${markdownContent}\n\nPress OK to Open Obsidian`;
-    const shouldOpenObsidian = window.confirm(confirmationMessage)
-    window.setTimeout(async () => {
-      console.log(markdownContent)
-      await navigator.clipboard.writeText(markdownContent)
-    }, 100)
-    // unawaited
-    chrome.runtime.sendMessage({ action: "clearNotification" });
-
-    if (shouldOpenObsidian) {
-      // 7. Open Obsidian URI
-      const obsidianUri = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(aiResult.titleName)}.md`;
-      window.location.href = obsidianUri;
-    }
+    // 5. Send to background to handle clipboard and notification
+    await chrome.runtime.sendMessage({
+      action: "clippingComplete",
+      markdownContent: markdownContent,
+      titleName: aiResult.titleName,
+      summary: aiResult.summary,
+      vaultName: vaultName,
+      obsidianUri: `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(aiResult.titleName)}.md`
+    });
   } catch (error) {
     console.error("Web Clipper Error:", error);
     alert("An error occurred while clipping the content.");
@@ -287,10 +284,10 @@ async function clipVerbatim() {
   const hostname = new URL(url).hostname;
   if (hostname.includes("twitter.com") || hostname.includes("x.com")) {
     const bodyText = document.querySelector('article div[data-testid="tweetText"]').innerText
-    await navigator.clipboard.writeText(`* ["${bodyText}"](${url})`)
+    await chrome.runtime.sendMessage({ action: "copyToClipboard", text: `* ["${bodyText}"](${url})` })
   } else if (hostname.includes("bsky.app")) {
     const bodyText = [...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem') && x.clientWidth > 0)[0].innerText
-    await navigator.clipboard.writeText(`* ["${bodyText}"](${url})`)
+    await chrome.runtime.sendMessage({ action: "copyToClipboard", text: `* ["${bodyText}"](${url})` })
   }
 }
 
@@ -313,5 +310,22 @@ async function clipArticle() {
 
   const message = `* ["${headline}" - ${origin} (${authors})](${url})`
   console.debug(message)
-  await navigator.clipboard.writeText(message)
+  await chrome.runtime.sendMessage({ action: "copyToClipboard", text: message })
+}
+
+async function clipCitation() {
+  const url = window.location.href
+  let title; let publisher;
+  
+  if (url.includes('instapaper')) {
+    title = document.querySelector('main h1').innerText
+    publisher = document.querySelector('a.original')?.innerText?.trim()
+  } else {
+    title = document.querySelector('meta[property="og:title"]')?.content || document.title
+    publisher = document.querySelector('meta[property="og:site_name"]')?.content || new URL(url).hostname
+  }
+
+  const citation = `${title}. ${publisher}. ${url}`
+  console.debug(citation)
+  await chrome.runtime.sendMessage({ action: "copyToClipboard", text: citation })
 }
