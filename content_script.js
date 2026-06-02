@@ -181,10 +181,18 @@ async function extractContent(url) {
 }
 
 async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, suggestedFiles) {
-  const params = await LanguageModel.params();
+  let params = { defaultTopK: 3 };
+  try {
+    if (typeof LanguageModel.params === 'function') {
+      params = await LanguageModel.params();
+    }
+  } catch (e) {
+    console.warn("LanguageModel.params() failed, using defaults", e);
+  }
+
   const session = await LanguageModel.create({
     temperature: 0.2,
-    topK: params.defaultTopK,
+    topK: params?.defaultTopK || 3,
     expectedInputs: [{
       type:'text', languages: ['en'],
     }, {
