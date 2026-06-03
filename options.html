@@ -23,7 +23,26 @@
     <textarea id="filenames" rows="5"></textarea>
   </div>
 
-  <button id="save">Save</button>
+  <hr>
+
+  <div>
+    <label>AI Source:</label>
+    <input type="radio" id="source-local" name="aiSource" value="local" checked style="width: auto;"> 
+    <label for="source-local" style="display: inline;">Local (Chrome Built-in AI)</label>
+    <br>
+    <input type="radio" id="source-gemini" name="aiSource" value="gemini" style="width: auto;"> 
+    <label for="source-gemini" style="display: inline;">External (Gemini Flash 3.0)</label>
+  </div>
+
+  <div id="gemini-api-key-container" style="display: none;">
+    <label for="geminiApiKey">Gemini API Key:</label>
+    <input type="password" id="geminiApiKey" placeholder="Enter your Gemini API Key">
+    <small>Get one at <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></small>
+  </div>
+
+  <hr>
+
+  <button id="save">Save Settings</button>
   <div id="status"></div>
 
   <div>

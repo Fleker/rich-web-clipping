@@ -4,8 +4,8 @@ const CONTEXT_MENU_ARTICLE_ID = "FELKER_WEB_CLIPPER_ARTICLE";
 const CONTEXT_MENU_CITATION_ID = "FELKER_WEB_CLIPPER_CITATION";
 const NOTIFICATION_ID = "FELKER_WEB_CLIPPER_NOTIFICATION";
 /** Add a suffix so I know whether this is dev or prod */
-const DEBUG_SUFF = ` (ALPHA)`
-// const DEBUG_SUFF = ``
+// const DEBUG_SUFF = ` (ALPHA)`
+const DEBUG_SUFF = ``
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({

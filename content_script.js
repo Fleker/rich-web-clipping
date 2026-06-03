@@ -34,9 +34,19 @@ LanguageModel.availability({
   })
 
 async function main() {
-  if (!languageModelWorking) {
-    return window.alert('Language model is not available')
+  // 2. Get settings from chrome storage
+  const { vaultName, fileNames, aiSource, geminiApiKey } = await chrome.storage.sync.get([
+    "vaultName", "fileNames", "aiSource", "geminiApiKey"
+  ]);
+
+  if (aiSource === 'local' && !languageModelWorking) {
+    return window.alert('Local language model is not available. Please check settings or download the model.')
   }
+
+  if (aiSource === 'gemini' && !geminiApiKey) {
+    return window.alert('Gemini API Key is missing. Please add it in the extension options.')
+  }
+
   // unawaited
   chrome.runtime.sendMessage({ action: "showNotification" });
 
@@ -49,15 +59,14 @@ async function main() {
       return;
     }
 
-    // 2. Get settings from chrome storage
-    const { vaultName, fileNames } = await chrome.storage.sync.get(["vaultName", "fileNames"]);
-
-    // 3. Use on-device AI for summary and filename
+    // 3. Use AI for summary and filename
     const aiResult = await getAiSummaryAndFileName(
       pageContent.text,
       pageContent.imageCaptions,
-      pageContent.imageBitmaps || [],
-      fileNames || []
+      pageContent.imageDatas || [],
+      fileNames || [],
+      aiSource || 'local',
+      geminiApiKey
     );
     // unawaited
     chrome.runtime.sendMessage({ action: "clearNotification" });
@@ -86,7 +95,7 @@ async function main() {
   }
 }
 
-async function getCrossOriginBitmap(imageUrl) {
+async function getCrossOriginImageData(imageUrl) {
     // 1. Send the URL to the background script
     const response = await chrome.runtime.sendMessage({
         action: "fetchCrossOriginImage",
@@ -113,7 +122,7 @@ async function getCrossOriginBitmap(imageUrl) {
     // 4. Create the ImageBitmap (now safe to draw to canvas/create bitmap)
     const bitmap = await createImageBitmap(tempImg);
     
-    return bitmap;
+    return { bitmap, dataUrl };
 }
 
 async function extractContent(url) {
@@ -122,40 +131,40 @@ async function extractContent(url) {
     // Extract tweet, thread, quoted tweet, images
     console.debug("Extracting from Twitter/X");
 
-    const imageBitmaps = await Promise.all(
+    const imageDatas = await Promise.all(
       [...document.querySelectorAll('article div[data-testid="tweetPhoto"] img')]
         .slice(0, 4)
         .map(async (img) => {
           console.debug(img.src)
-          return await getCrossOriginBitmap(img.src)
+          return await getCrossOriginImageData(img.src)
         })
     );
 
     return {
       text: document.querySelector('article').innerText,
       imageCaptions: [...document.querySelector('article').querySelectorAll('img')].map(x => x.alt).filter(x => x),
-      imageBitmaps,
+      imageDatas,
     }
   } else if (hostname.includes("bsky.app")) {
     // Extract post, thread, quoted post, images
     console.debug("Extracting from BlueSky");
     // console.debug([...document.querySelectorAll('[data-testid]')]
     //   .filter(x => x.dataset.testid.startsWith('postThreadItem') && x.clientWidth > 0)[0].innerText)
-    const imageBitmaps = await Promise.all(
+    const imageDatas = await Promise.all(
       [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem'))[0].querySelectorAll('img')]
         .filter(img => {
           return !img.src.includes('avatar')
         })
         .map(async (img) => {
           console.debug(img.src)
-          return await getCrossOriginBitmap(img.src)
+          return await getCrossOriginImageData(img.src)
         })
     );
 
     return {
       text: [...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem') && x.clientWidth > 0)[0].innerText,
       imageCaptions: [...[...document.querySelectorAll('[data-testid]')].filter(x => x.dataset.testid.startsWith('postThreadItem') && x.clientWidth > 0)[0].querySelectorAll('img')].map(x => x.alt).filter(x => x),
-      imageBitmaps,
+      imageDatas,
     }
   } else if (hostname.includes("instapaper.com")) {
     // Extract article content
@@ -172,37 +181,29 @@ async function extractContent(url) {
     }
   } else {
     console.debug("Extracting generic content");
+    const imageDatas = await Promise.all(
+      [...document.querySelectorAll('img')]
+        .slice(0, 4)
+        .map(async (img) => {
+          console.debug(img.src)
+          try {
+            return await getCrossOriginImageData(img.src)
+          } catch (e) {
+            console.warn('failed to fetch image', img.src)
+            return null
+          }
+        })
+    );
+
     return {
       text: document.body.innerText,
       imageCaptions: [...document.querySelectorAll('img')].map(x => x.alt).filter(x => x),
-      imageBitmaps: [],
+      imageDatas: imageDatas.filter(x => x),
     }
   }
 }
 
-async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, suggestedFiles) {
-  let params = { defaultTopK: 3 };
-  try {
-    if (typeof LanguageModel.params === 'function') {
-      params = await LanguageModel.params();
-    }
-  } catch (e) {
-    console.warn("LanguageModel.params() failed, using defaults", e);
-  }
-
-  const session = await LanguageModel.create({
-    temperature: 0.2,
-    topK: params?.defaultTopK || 3,
-    expectedInputs: [{
-      type:'text', languages: ['en'],
-    }, {
-      type:'image'
-    }],
-    expectedOutputs: [{
-      type:'text', languages: ['en']
-    }]
-  })
-
+async function getAiSummaryAndFileName(content, imageContext, imageDatas, suggestedFiles, aiSource, geminiApiKey) {
   const prompt = `
     Based on the following content, provide a short, one-sentence summary and a suitable title name.
     The summary should be a short 1-line summary or key learning with key vocabulary. Say the account name if it makes sense.
@@ -219,10 +220,6 @@ async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, sugg
     - ${imageContext.join("\n- ")}}
     ---
 
-    ${imageBitmaps.length ? `
-    Use the images included in this prompt in your summary
-    ` : ''}
-
     Respond in JSON format with "summary" and "titleName" keys. The titleName should not include an extension.
     Example: {"summary": "A summary of the content.", "titleName": "A Good File Name"}
   `;
@@ -235,25 +232,80 @@ async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, sugg
     }
   }
 
-  console.debug(prompt)
-  console.debug(imageBitmaps.length, 'bitmaps')
-  const promptContent = [{
-    type: 'text',
-    value: prompt
-  }]
-  if (imageBitmaps.length) {
-    imageBitmaps.forEach(img => {
-      promptContent.push({
-        type: 'image',
-        value: img,
+  let aiResponse;
+
+  if (aiSource === 'gemini') {
+    const parts = [{ text: prompt }];
+    
+    for (const imgData of imageDatas) {
+      if (imgData.dataUrl) {
+        const [header, base64Data] = imgData.dataUrl.split(';base64,');
+        const mimeType = header.split(':')[1];
+        parts.push({
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Data
+          }
+        });
+      }
+    }
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-goog-api-key': geminiApiKey
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          response_mime_type: "application/json",
+          temperature: 0.2
+        }
       })
-    })
-    console.debug(promptContent)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    aiResponse = data.candidates[0].content.parts[0].text;
+  } else {
+    // Local Model
+    let params = { defaultTopK: 3 };
+    try {
+      if (typeof LanguageModel.params === 'function') {
+        params = await LanguageModel.params();
+      }
+    } catch (e) {
+      console.warn("LanguageModel.params() failed, using defaults", e);
+    }
+
+    const session = await LanguageModel.create({
+      temperature: 0.2,
+      topK: params?.defaultTopK || 3,
+      expectedInputs: [{ type: 'text', languages: ['en'] }, { type: 'image' }],
+      expectedOutputs: [{ type: 'text', languages: ['en'] }]
+    });
+
+    try {
+      const promptContent = [{ type: 'text', value: prompt }];
+      if (imageDatas.length) {
+        imageDatas.forEach(img => {
+          if (img.bitmap) {
+            promptContent.push({ type: 'image', value: img.bitmap });
+          }
+        });
+      }
+      
+      aiResponse = await session.prompt([
+        { role: "user", content: promptContent, responseConstraint: schema },
+      ]);
+    } finally {
+      session.destroy();
+    }
   }
-  const aiResponse = await session.prompt([
-    { role: "user", content: promptContent, responseConstraint: schema},
-  ]);
-  // console.debug('res1', aiResponse)
 
   try {
     let aiProcessedRes = aiResponse
@@ -281,8 +333,6 @@ async function getAiSummaryAndFileName(content, imageContext, imageBitmaps, sugg
     console.error("Failed to parse AI response:", aiResponse);
     // Fallback if JSON parsing fails
     return null
-  } finally {
-    session.destroy();
   }
 }
 

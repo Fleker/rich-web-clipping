@@ -13,6 +13,8 @@ FILES=(
     "manifest.json"
     "background.js"
     "content_script.js"
+    "offscreen.html"
+    "offscreen.js"
     "options.html"
     "options.js"
     "green-clipboard-16.png"
